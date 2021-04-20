@@ -45,6 +45,9 @@ class SensorArray:
         elements (from -M/2 to +M/2, with index 0 being at the center)
         """
     
+        M_even_error = "Number of sensors must be odd"
+        assert M%2, M_even_error
+    
         # inter sensor spacing
         d = L/(M-1)
     
