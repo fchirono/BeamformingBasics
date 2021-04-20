@@ -183,28 +183,3 @@ def delayandsum_beamformer(SensorArrayObj, p_array, theta, weights, fs, c0=1500)
     y_beamformer *= 1./M
     
     return y_beamformer
-
-
-def create_unif_lin_array(L, M):
-    """
-    Creates a uniform linear array with length 'L' and 'M' elements distributed
-    over the 'x' axis. M should be odd
-    
-    Returns a (2, M)-shaped array with (x,y) coordinates of array elements,
-    the array inter-element spacing 'd', and the indices 'm' of the array
-    elements (from -M/2 to +M/2, with index 0 being at the center)
-    """
-
-    # inter sensor spacing
-    d = L/(M-1)
-
-    print("Array inter sensor spacing is {} m".format(d))
-
-    # array sensor indices
-    m_indices = np.linspace(-(M//2), M//2, M, dtype=int)
-
-    # array elements spatial coordinates
-    XY_array = np.zeros((2, M))
-    XY_array[0, :] = np.linspace(-L/2, L/2, M)
-
-    return XY_array, d, m_indices
