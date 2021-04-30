@@ -20,13 +20,22 @@ rng = np.random.default_rng()
 
 class SensorArray:
     """
-    Class to store microphone/hydrophone array geometry.
+    Class to store Uniform Linear Array geometry.
     
-    L: array length [m]
-    M: number of sensors (always odd)
-    d: inter sensor spacing [m]
-    XY: (2,M) array with sensor coordinates in 2D (x,y) space
-    m: sensor indices, from -(M-1)/2 to +(M-1)/2
+    L : float
+        Array length [m]
+    
+    M : int
+        Number of sensors (must be odd)
+    
+    d : float
+        Inter sensor spacing [m]
+        
+    XY : (2,M) array_like
+        Numpy array with sensor coordinates in 2D (x,y) space
+        
+    m : (M,) array_like
+        Numpy array of integer sensor indices, from -(M-1)/2 to +(M-1)/2
     """
     
     def __init__(self, L, M):
@@ -34,15 +43,37 @@ class SensorArray:
         self.L = L
         
         self.XY, self.d, self.m = self.create_unif_lin_array(L, M)
+
         
     def create_unif_lin_array(self, L, M):
         """
-        Creates a uniform linear array with length 'L' and 'M' elements distributed
-        over the 'x' axis. M should be odd
+        Creates a uniform linear array with length 'L' and 'M' elements
+        distributed over the 'x' axis. By convenience, 'M' must be odd.
         
-        Returns a (2, M)-shaped array with (x,y) coordinates of array elements,
-        the array inter-element spacing 'd', and the indices 'm' of the array
-        elements (from -M/2 to +M/2, with index 0 being at the center)
+        Parameters
+        ----------
+        L : float
+            Array length [m]
+        
+        M : int
+            Number of sensors (must be odd)
+        
+        Returns
+        -------
+        XY_array : (2, M) array_like
+            Numpy array with (x,y) coordinates of array elements
+        
+        d : float
+            Array inter-element spacing [m]
+        
+        m_indices : 
+            Array of indices from -(M-1)/2 to +(M-1)/2, with index 0 being at
+            the center.
+        
+        Notes
+        -----
+        By convenience, the number of elements 'M' in the array must always be
+        odd.
         """
     
         M_even_error = "Number of sensors must be odd"
@@ -66,6 +97,23 @@ class SensorArray:
 def delay_signal(x, t0, fs):
     """
     Delay a time-domain signal 'x', sampled at 'fs' Hz, by 't0' seconds.
+
+    Parameters
+    ----------
+    x : (N_dft,) array_like
+        Numpy vector of length 'N_dft' containing signal of interest
+
+    t0 : float
+        Time by which to delay signal 'x', in seconds
+        
+    fs : int
+        Sampling frequency, in Hz
+
+    Returns
+    -------
+    x_delayed : (N,)
+        Time-delayed copy of input signal 'x'
+
     """
     
     X_f = np.fft.rfft(x)
@@ -84,6 +132,27 @@ def create_narrowband_pulse(A, T, f0, fs):
     Creates a narrowband pulse signal with amplitude 'A', duration 'T' seconds,
     center frequency 'f0' Hz, and sampling frequency 'fs' Hz.
     
+    Parameters
+    ----------
+    A : float
+        Signal peak amplitude
+    
+    T : float
+        Signal duration, in seconds
+    
+    f0 : float
+        Signal center frequency, in Hz
+    
+    fs : int
+        Sampling frequency, in Hz
+    
+    Returns
+    -------
+    p_pulse : (N_pulse,) array_like
+        Numpy vector containing narrowband pulse signal.
+    
+    Notes
+    -----
     The signal is a sine wave of amplitude 'A', frequency 'f0', and random
     initial phase, modulated by a Hann window of duration 'T'.
     """
@@ -93,24 +162,63 @@ def create_narrowband_pulse(A, T, f0, fs):
     dt = 1./fs
 
     t_pulse = np.linspace(0, T-dt, N_pulse)
-    p_pulse = A*np.sin(2*np.pi*f0*t_pulse + rng.uniform(0, 2*np.pi, 1)[0])*np.hanning(N_pulse)
+    p_pulse = A*np.sin(2*np.pi*f0*t_pulse
+                       + rng.uniform(0, 2*np.pi, 1)[0])*np.hanning(N_pulse)
     
     return p_pulse
 
 
-def create_array_signals(SensorArrayObj, p_signal, t_initial, T, theta0_deg,
+def create_array_signals(SensorArrayObj, p_source, t_initial, T, theta0_deg,
                          fs, c0=1500, SNR_dB=None):
     """
-    Create a Numpy array of time-domain signals as recorded from a Uniform Linear Array
+    Create a Numpy array of time-domain signals simulating a recording with a
+    Uniform Linear Array
+
+    Parameters
+    ----------
+    SensorArrayObj : instance of SensorArray class
+        Instance containing array geometry information
     
-    SensorArrayObj: instance of SensorArray containing array geometry info
-    p_signal: source signal to be inserted into array data (say, a pulse)
-    t_initial: onset time (in seconds) for p_signal within sensor signal
-    T: sensor signal duration (in seconds)
-    theta0_deg: direction of arrival of source signal
-    fs: sampling frequency [Hz]
-    c0: sound speed (by default, 1500 m/s)
-    SNR_dB: signal-to-noise ratio, calculated over duration of p_signal
+    p_source : (N,) array_like
+        Numpy vector containing 'clean' (i.e. no noise) source signal in time.
+    
+    t_initial : float
+        Time at which source signal reaches the center array sensor.
+    
+    T : float
+        Total sensor signal duration, in seconds.
+    
+    theta0_deg : float
+        Direction of arrival of source signal, relative to array axis, in
+        degrees.
+    
+    fs : int
+        Sampling frequency, in Hz.
+    
+    c0 : float, optional
+        Speed of sound, in meters per second. The default is 1500 (water).
+    
+    SNR_dB : float, optional
+        Signal-to-noise ratio, in decibels, as observed at sensor elements. The
+        default is None (no noise at array sensors).
+
+    Returns
+    -------
+    p_array : (M, T*fs) array_like
+        Numpy array containing 'M' channels of array signals over time.
+
+    Notes
+    -----
+    This model assumes the source signal arrives at the array as a plane wave.
+    
+    The 'SNR_dB' parameter controls how much uncorrelated white noise is added
+    to the sensors. If 'SNR_dB=None', no white noise is added to the array
+    signals.
+    
+    The SNR is calculated from the ratio between the total variance in
+    'p_source' to the total variance in the additive white noise signal, so
+    it denotes a 'broadband' notion of SNR. This interpretation of SNR might
+    not be valid to all contexts.
     """
     
     # instantiate a random number generator
@@ -123,7 +231,7 @@ def create_array_signals(SensorArrayObj, p_signal, t_initial, T, theta0_deg,
     times_of_arrival = -SensorArrayObj.m*SensorArrayObj.d*np.cos(theta0)/c0
     
     N_initial= int(t_initial*fs)
-    N_final = N_initial + p_signal.shape[0]
+    N_final = N_initial + p_source.shape[0]
     
     # No. of samples in array data (total duration)
     N = int(T*fs)
@@ -136,14 +244,14 @@ def create_array_signals(SensorArrayObj, p_signal, t_initial, T, theta0_deg,
     
     else:
         # if SNR_dB is given, add random noise to array signals at desired SNR
-        signal_var = np.var(p_signal)
+        signal_var = np.var(p_source)
         noise_var = signal_var/(10**(SNR_dB/10))
         p_array = rng.normal(0., np.sqrt(noise_var), (SensorArrayObj.M, N))
     
     # for each sensor in array...
     for m in range(SensorArrayObj.M):
         # ...adds signal at time 't_initial'...
-        p_array[m, N_initial:N_final] += p_signal
+        p_array[m, N_initial:N_final] += p_source
         
         # ...and time-shifts signal for given time-of-arrival
         p_array[m, :] = delay_signal(p_array[m, :], times_of_arrival[m], fs)
@@ -152,16 +260,44 @@ def create_array_signals(SensorArrayObj, p_signal, t_initial, T, theta0_deg,
 
 
 
-def delayandsum_beamformer(SensorArrayObj, p_array, theta, weights, fs, c0=1500):
+def delayandsum_beamformer(SensorArrayObj, p_array, theta, weights, fs,
+                           c0=1500):
     """
     Calculates simplified delay-and-sum beamformer for a given array geometry 
     and sensor signals, over a set of pre-determined directions.
     
-    SensorArrayObj: 
-    p_array:
-    theta:
-    weights:
-    c0: speed of sound
+    Parameters
+    ----------
+    SensorArrayObj : instance of SensorArray class
+        Instance containing array geometry information
+        
+    p_array : (M, T*fs) array_like
+        Numpy array containing 'M' channels of array signals over time.
+    
+    theta : (N_theta,) array_like
+        Numpy vector containing set of desired steering ('look') directions, in radians.
+    
+    weights : (M,) array_like
+        Numpy vector containing array amplitude weighting coefficients.
+    
+    fs : int
+        Sampling frequency, in Hz.
+    
+    c0 : float, optional
+        Speed of sound, in meters per second. The default is 1500 (water).
+    
+    Returns
+    -------
+    y_beamformer : (N_theta, T*fs,) array_like
+        Numpy array containing the time-domain beamformer output signal for
+        each steering direction.
+    
+    Notes
+    -----
+    This code was created to illustrate the performance of a delay-and-sum
+    beamformer system, and its performance is *significantly* sub-optimal. For
+    serious beamforming applications, one should seriously consider a more
+    optimized implementation.
     """
     
     N_theta = theta.shape[0]
@@ -182,7 +318,8 @@ def delayandsum_beamformer(SensorArrayObj, p_array, theta, weights, fs, c0=1500)
             # delay and sum signals
             y_beamformer[theta_i, :] += weights[m]*delay_signal(p_array[m, :], -time_delays[m], fs)
     
-    # compensate for No. of sensors in array
-    y_beamformer *= 1./M
+    # compensate for Nweights / No. of sensors in array
+    y_beamformer *= 1./np.sum(weights**2)
     
     return y_beamformer
+
